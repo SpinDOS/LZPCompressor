@@ -15,7 +15,7 @@ namespace LZPCompressor
 
         public byte[] Compress(byte[] input)
         {
-            OutputWriter output = new OutputWriter();
+            OutputWriter output = new OutputWriter(0);
             int[] table = new int[ushort.MaxValue + 1];
             for (int i = 0; i < table.Length; i++)
                 table[i] = -1;
@@ -54,7 +54,14 @@ namespace LZPCompressor
                     }
                 }
                 int length = FindLength(cur, pos, input);
-                WriteLengthToOutput(length, output);
+
+                if (length == 1)
+                    output.WriteFlag(false);
+                else
+                {
+                    output.WriteFlag(true);
+                    output.WriteLength(length - 1);
+                }
                 cur += length;
             }
 
@@ -74,77 +81,79 @@ namespace LZPCompressor
             return result;
         }
 
-        private void WriteLengthToOutput(int length, OutputWriter output)
-        {
-            if (length == 1)
-                output.WriteFlag(false);
-            else
-            {
-                output.WriteFlag(true);
-                output.WriteLength(length - 1);
-            }
-        }
-
         public byte[] Decompress(byte[] input)
         {
-            return new byte[0];
             List<byte> output = new List<byte>(input.Length);
-            InputReader reader = new InputReader(input.Skip(4));
+            InputReader reader = new InputReader(input);
             int[] table = new int[ushort.MaxValue + 1];
 
+            output.Add(reader.ReadByte());
+            output.Add(reader.ReadByte());
+            output.Add(reader.ReadByte());
             int curOut = 3;
 
-            while (true)
+            try
             {
-                if (reader.ReadFlag()) // 2 literals
+                while (true)
                 {
-                    output.Add(reader.ReadByte());
-                    table[Hash(output[curOut - 3], output[curOut - 2], output[curOut - 1])] = curOut++;
-                    output.Add(reader.ReadByte());
-                    table[Hash(output[curOut - 3], output[curOut - 2], output[curOut - 1])] = curOut++;
-                }
-                else
-                {
-                    if (reader.ReadFlag()) // literal + match
+                    if (reader.ReadFlag()) // 2 literals
                     {
+
                         output.Add(reader.ReadByte());
                         table[Hash(output[curOut - 3], output[curOut - 2], output[curOut - 1])] = curOut++;
-                    }
-                    // match
-                    ushort hash = Hash(output[curOut - 3], output[curOut - 2], output[curOut - 1]);
-                    int pos = table[hash];
-                    table[hash] = curOut++;
-                    if (!reader.ReadFlag())
-                    {
-                        output.Add(output[pos]);
+                        output.Add(reader.ReadByte());
+                        table[Hash(output[curOut - 3], output[curOut - 2], output[curOut - 1])] = curOut++;
+
                     }
                     else
                     {
-                        int length = reader.ReadLength();
-                        curOut += length - 1;
-                        while (length-- > 0)
-                            output.Add(output[pos++]);
+                        if (reader.ReadFlag()) // literal + match
+                        {
+                            output.Add(reader.ReadByte());
+                            table[Hash(output[curOut - 3], output[curOut - 2], output[curOut - 1])] = curOut++;
+                        }
+                        // match
+                        ushort hash = Hash(output[curOut - 3], output[curOut - 2], output[curOut - 1]);
+                        int pos = table[hash];
+                        table[hash] = curOut++;
+                        if (!reader.ReadFlag())
+                        {
+                            output.Add(output[pos]);
+                        }
+                        else
+                        {
+                            int length = reader.ReadLength();
+                            curOut += length - 1;
+                            while (length-- > 0)
+                                output.Add(output[pos++]);
+                        }
+
                     }
-                    
                 }
             }
+            catch (IndexOutOfRangeException)
+            {
+                if (reader.NotReadBits == 8)
+                    output.Add(reader.WorkingByte);
+            }
 
-            //if (cur == inputLength - 1)
-            //{
-            //    byte b = reader.ReadByte();
-            //    if (b != 0)
-            //        output.Add(b);
-            //}
             return output.ToArray();
         }
 
     }
 
-    class OutputWriter
+    struct OutputWriter
     {
-        private readonly List<byte> result = new List<byte>();
-        private int WorkingByte = 0;
-        private int BitsBusy = 0;
+        private readonly List<byte> result;
+        private int WorkingByte;
+        private int BitsBusy;
+
+        public OutputWriter(int notused)
+        {
+            result = new List<byte>();
+            WorkingByte = 0;
+            BitsBusy = 0;
+        }
 
         public void WriteByte(int b)
         {
@@ -168,45 +177,49 @@ namespace LZPCompressor
         public byte[] GetArray()
         {
             if (BitsBusy != 0)
-                result.Add((byte)WorkingByte);
+            {
+                int b = (1 << (8 - BitsBusy)) - 1;
+                result.Add((byte) (WorkingByte + b));
+            }
             return result.ToArray();
         }
 
-        //public void WriteLength(int length)
-//        {
-//            --length;
-//            if (length < 0)
-//                throw new ArgumentException(nameof(length));
-//            int bits = 2;
-//            if (WriteLengthSegment(ref length, bits))
-//                return;
-//            bits = 3;
-//            if (WriteLengthSegment(ref length, bits))
-//                return;
-//            bits = 5;
-//            if (WriteLengthSegment(ref length, bits))
-//                return;
-//            bits = 8;
-//            while (!WriteLengthSegment(ref length, bits))
-//            { }
-//        }
+        public void WriteLength(int length)
+        {
+            --length;
+            int bits = 2;
+            if (WriteLengthSegment(ref length, bits))
+                return;
+            bits = 3;
+            if (WriteLengthSegment(ref length, bits))
+                return;
+            bits = 5;
+            if (WriteLengthSegment(ref length, bits))
+                return;
+            while (length >= 0xFF)
+            {
+                WriteByte(0xFF);
+                length -= 0xFF;
+            }
+            WriteByte(length);
+        }
 
-        //        private bool WriteLengthSegment(ref int length, int bits)
-        //        {
-        //            if (length + 1 < 1 << bits)
-        //            {
-        //                for (int i = bits - 1; i >= 0; i--)
-        //                    WriteFlag((length & 1 << i) != 0);
-        //                return true;
-        //            }
-        //            else
-        //            {
-        //                for (int i = 0; i < bits; i++)
-        //                    WriteFlag(true);
-        //                length -= (1 << bits) - 1;
-        //                return false;
-        //            }
-        //        }
+        private bool WriteLengthSegment(ref int length, int bits)
+        {
+            if (length + 1 < 1 << bits)
+            {
+                for (int i = bits - 1; i >= 0; i--)
+                    WriteFlag((length & 1 << i) != 0);
+                return true;
+            }
+            else
+            {
+                for (int i = 0; i < bits; i++)
+                    WriteFlag(true);
+                length -= (1 << bits) - 1;
+                return false;
+            }
+        }
 
         //public void WriteLength(int length)
         //{
@@ -295,80 +308,52 @@ namespace LZPCompressor
 
         //    WriteByte(length);
         //}
-        public void WriteLength(int length)
-        {
-            --length;
-            int bits = 2;
-            if (WriteLengthSegment(ref length, bits))
-                return;
-            bits = 3;
-            if (WriteLengthSegment(ref length, bits))
-                return;
-            bits = 5;
-            if (WriteLengthSegment(ref length, bits))
-                return;
-            bits = 8;
-            while (!WriteLengthSegment(ref length, bits))
-            { }
-        }
 
-        private bool WriteLengthSegment(ref int length, int bits)
-        {
-            if (length + 1 < 1 << bits)
-            {
-                for (int i = bits - 1; i >= 0; i--)
-                    WriteFlag((length & 1 << i) != 0);
-                return true;
-            }
-            else
-            {
-                for (int i = 0; i < bits; i++)
-                    WriteFlag(true);
-                length -= (1 << bits) - 1;
-                return false;
-            }
-        }
     }
 
-    class InputReader
+    struct InputReader
     {
-        private IEnumerator<byte> Input;
+        private byte[] Input;
+        public int cur;
 
-        public byte NotReadBits { get; private set; } = 8;
+        private byte notReadBits;
 
-        public byte WorkingByte { get; private set; }
-        public InputReader(IEnumerable<byte> input)
+        public byte NotReadBits { get { return notReadBits; } }
+
+        public byte WorkingByte { get { return workingByte; } }
+
+        private byte workingByte;
+
+        public InputReader(byte[] input)
         {
-            Input = input.GetEnumerator();
-            WorkingByte = Input.Current;
+            Input = input;
+            cur = 0;
+            workingByte = Input[0];
+            notReadBits = 8;
         }
 
         public bool ReadFlag()
         {
-            bool result = (WorkingByte & 1 << --NotReadBits) != 0;
+            bool result = (workingByte & 1 << --notReadBits) != 0;
             if (NotReadBits == 0)
             {
-                Input.MoveNext();
-                WorkingByte = Input.Current;
-                NotReadBits = 8;
+                workingByte = Input[++cur];
+                notReadBits = 8;
             }
             return result;
         }
 
         public byte ReadByte()
         {
-            byte result = (byte)(WorkingByte << (8 - NotReadBits));
-            if (Input.MoveNext())
-            {
-                WorkingByte = Input.Current;
-                result = (byte) (result + (WorkingByte >> NotReadBits));
-            }
+            byte result = (byte) (workingByte << (8 - NotReadBits));
+            workingByte = Input[++cur];
+            result = (byte) (result + (workingByte >> NotReadBits));
             return result;
         }
 
         public int ReadLength()
         {
-            int length = 0;
+            int length = 1;
             int bits = 2;
             if (ReadLengthSegment(ref length, bits))
                 return length;
@@ -381,7 +366,7 @@ namespace LZPCompressor
             bits = 8;
             while (!ReadLengthSegment(ref length, bits))
             { }
-            return length + 1;
+            return length;
         }
 
         private bool ReadLengthSegment(ref int length, int bitCount)

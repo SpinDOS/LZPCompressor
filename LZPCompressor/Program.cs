@@ -23,24 +23,35 @@ namespace LZPCompressor
         [STAThread]
         static void Main(string[] args)
         {
+            for (int i = 0; i < 10000; i++)
+            {
+                Random rnd = new Random();
+                int length = rnd.Next(4, 5000);
+                byte[] arr = new byte[length];
+                rnd.NextBytes(arr);
+                byte[] arr2 = new LZP1().Decompress(new LZP1().Compress(arr));
+                if (arr.Length != arr2.Length)
+                    Console.WriteLine("Error length");
+                for (int j = 0; j < arr.Length; j++)
+                    if (arr[j] != arr2[j])
+                        Console.WriteLine("Error bytes");
+            }
+            Console.WriteLine("Ok");
+            Console.ReadLine();
+
+
             string file = args[0];
             var input = File.ReadAllBytes(file);
-            Console.WriteLine("Last bytes: " + input[input.Length - 2] + " " + input[input.Length - 1]);
             Console.WriteLine("Input size: " + input.Length);
             var sw = Stopwatch.StartNew();
             var output = new LZP1().Compress(input);
             sw.Stop();
-            Console.WriteLine("Time: " + sw.ElapsedMilliseconds);
+            Console.WriteLine("Compress time: " + sw.ElapsedMilliseconds);
             Console.WriteLine("Output size: " + output.Length);
-            var inp = input;
-            input = new LZP1().Decompress(output);
-            Console.WriteLine("Decompressed size: " + input.Length);
-            for (int i = 0; i < inp.Length; i++)
-            {
-                if (input[i] != inp[i])
-                    Console.WriteLine("Error " + i);
-                break;
-            }
+            sw = Stopwatch.StartNew();
+            new LZP1().Decompress(output);
+            sw.Stop();
+            Console.WriteLine("Decompress time: " + sw.ElapsedMilliseconds);
             Console.WriteLine("OK");
             Console.ReadLine();
 
