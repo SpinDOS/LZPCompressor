@@ -23,7 +23,8 @@ namespace LZPCompressor
         [STAThread]
         static void Main(string[] args)
         {
-            //for (int i = 0; i < 10000; i++)
+            //List<byte[]> badArrs = new List<byte[]>();
+            //for (int i = 0; i < int.MaxValue; i++)
             //{
             //    Random rnd = new Random();
             //    int length = rnd.Next(4, 5000);
@@ -31,17 +32,28 @@ namespace LZPCompressor
             //    rnd.NextBytes(arr);
             //    byte[] arr2 = new LZP1().Decompress(new LZP1().Compress(arr));
             //    if (arr.Length != arr2.Length)
+            //    {
             //        Console.WriteLine("Error length");
+            //        badArrs.Add(arr);
+            //    }
             //    else
             //        for (int j = 0; j < arr.Length; j++)
             //            if (arr[j] != arr2[j])
+            //            {
             //                Console.WriteLine("Error bytes");
+            //                badArrs.Add(arr);
+            //                break;
+            //            }
             //}
-            //Console.WriteLine("Ok");
+            //Console.WriteLine(badArrs.Count);
+            //for (int i = 1; i <= badArrs.Count; i++)
+            //{
+            //    File.WriteAllBytes("error" + i, badArrs[i - 1]);
+            //}
             //Console.ReadLine();
 
 
-            string file = "1.pdf";
+            string file = args[0];
             var input = File.ReadAllBytes(file);
             Console.WriteLine("Input size: " + input.Length);
             var sw = Stopwatch.StartNew();
@@ -53,7 +65,7 @@ namespace LZPCompressor
             new LZP1().Decompress(output);
             sw.Stop();
             Console.WriteLine("Decompress time: " + sw.ElapsedMilliseconds);
-            Console.WriteLine("OK");
+
             Console.ReadLine();
 
             //Application.EnableVisualStyles();
