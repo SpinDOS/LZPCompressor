@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -12,7 +13,7 @@ using System.Windows.Forms;
 // Сравнить результативность по степени и по времени сжатия 
 // с другими компрессорами, использующими LZP-подобные методы.
 
-    
+
 namespace LZPCompressor
 {
     static class Program
@@ -23,54 +24,120 @@ namespace LZPCompressor
         [STAThread]
         static void Main(string[] args)
         {
-            //List<byte[]> badArrs = new List<byte[]>();
-            //for (int i = 0; i < int.MaxValue; i++)
-            //{
-            //    Random rnd = new Random();
-            //    int length = rnd.Next(4, 5000);
-            //    byte[] arr = new byte[length];
-            //    rnd.NextBytes(arr);
-            //    byte[] arr2 = new LZP1().Decompress(new LZP1().Compress(arr));
-            //    if (arr.Length != arr2.Length)
-            //    {
-            //        Console.WriteLine("Error length");
-            //        badArrs.Add(arr);
-            //    }
-            //    else
-            //        for (int j = 0; j < arr.Length; j++)
-            //            if (arr[j] != arr2[j])
-            //            {
-            //                Console.WriteLine("Error bytes");
-            //                badArrs.Add(arr);
-            //                break;
-            //            }
-            //}
-            //Console.WriteLine(badArrs.Count);
-            //for (int i = 1; i <= badArrs.Count; i++)
-            //{
-            //    File.WriteAllBytes("error" + i, badArrs[i - 1]);
-            //}
-            //Console.ReadLine();
+            string usageInfo = @"Usage: LZPCompessor.exe <c\d> <input> <output>";
 
+            if (args.Length != 3 ||
+                (args[0].ToUpper() != "C" && args[0].ToUpper() != "D"))
+            {
+                Console.WriteLine(usageInfo);
+                return;
+            }
 
-            string file = args[0];
-            var input = File.ReadAllBytes(file);
-            Console.WriteLine("Input size: " + input.Length);
-            var sw = Stopwatch.StartNew();
-            var output = new LZP1().Compress(input);
-            sw.Stop();
-            Console.WriteLine("Compress time: " + sw.ElapsedMilliseconds);
-            Console.WriteLine("Output size: " + output.Length);
-            sw = Stopwatch.StartNew();
-            new LZP1().Decompress(output);
-            sw.Stop();
-            Console.WriteLine("Decompress time: " + sw.ElapsedMilliseconds);
+            bool isCompress = args[0].ToUpper() == "C";
 
-            Console.ReadLine();
+            string inputFilename = args[1];
+            if (!File.Exists(inputFilename))
+            {
+                Console.WriteLine($@"File {inputFilename} does not exist!");
+                return;
+            }
+            byte[] inputArr;
+            try
+            {
+                inputArr = File.ReadAllBytes(inputFilename);
+            }
+            catch (IOException)
+            {
+                Console.WriteLine($@"Some errors occured while reading {inputFilename}!");
+                return;
+            }
+            catch (Exception e)
+            {
+                if (!(e is UnauthorizedAccessException) && !(e is SecurityException))
+                    throw;
+                Console.WriteLine($@"I do not have permissions to read {inputFilename}!");
+                return;
+            }
 
-            //Application.EnableVisualStyles();
-            //Application.SetCompatibleTextRenderingDefault(false);
-            //Application.Run(new Form1());
+            if (inputArr.Length < 4)
+            {
+                Console.WriteLine($@"File {inputFilename} is too small! " + 
+                    @"Your must use files more than 4 bytes size");
+                return;
+            }
+
+            string outputFilename = args[2];
+            if (File.Exists(outputFilename))
+            {
+                string ans;
+                do
+                {
+                    Console.Write($@"File {outputFilename} already exists. Do you want to rewrite it? (y\n): ");
+                    ans = Console.ReadLine()?.ToUpper();
+                } while (ans != "Y" && ans != "N");
+                if (ans == "Y")
+                    File.Delete(outputFilename);
+                else
+                {
+                    Console.WriteLine(usageInfo);
+                    return;
+                }
+            }
+
+            FileStream output = null;
+            try
+            {
+                output = File.OpenWrite(outputFilename);
+                var sw = Stopwatch.StartNew();
+                byte[] result = isCompress ? LZP1.Compress(inputArr) : LZP1.Decompress(inputArr);
+                sw.Stop();
+                Console.WriteLine((isCompress ? "Compress" : "Decompress") +
+                                  $@" complete in {sw.ElapsedMilliseconds} milliseconds");
+                if (isCompress)
+                {
+                    Console.WriteLine(@"Compress ratio = {0:0.###} ({1} ---> {2})",
+                        1.0*result.Length/inputArr.Length,
+                        inputArr.Length, result.Length);
+                }
+                output.Write(result, 0, result.Length);
+            }
+            catch (IndexOutOfRangeException)
+            {
+                Console.WriteLine($@"{inputFilename} is not LZP compressed file");
+                return;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                Console.WriteLine($@"I do not have permissions to write to {outputFilename}!");
+                return;
+            }
+            catch (IOException)
+            {
+                Console.WriteLine($@"Some errors occured while creating or writing {outputFilename}!");
+                return;
+            }
+            catch (OutOfMemoryException)
+            {
+                Console.WriteLine($@"File {inputFilename} is too big");
+                return;
+            }
+            catch (Exception e)
+            {
+                if (e is NotSupportedException || e is ArgumentException)
+                {
+                    Console.WriteLine(@"Invalid output filename: " + outputFilename);
+                    return;
+                }
+                throw;
+            }
+            finally
+            {
+                long? length = output?.Length;
+                output?.Close();
+                if (length.HasValue && length.Value < 4)
+                    File.Delete(outputFilename);
+            }
+
         }
     }
 }

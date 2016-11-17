@@ -9,11 +9,11 @@ using System.Threading.Tasks;
 
 namespace LZPCompressor
 {
-    class LZP1
+    internal static class LZP1
     {
-        private ushort Hash(byte x, byte y, byte z) => (ushort)(((x << 8) + z) ^ (y << 4));
+        private static ushort Hash(byte x, byte y, byte z) => (ushort)(((x << 8) + z) ^ (y << 4));
 
-        public byte[] Compress(byte[] input)
+        public static byte[] Compress(byte[] input)
         {
             OutputWriter output = new OutputWriter();
             int[] table = new int[ushort.MaxValue + 1];
@@ -74,7 +74,7 @@ namespace LZPCompressor
             return output.GetArray();
         }
 
-        private int FindLength(int cur, int fromTable, byte[] arr)
+        private static int FindLength(int cur, int fromTable, byte[] arr)
         {
             int length = 0;
             while (cur < arr.Length && arr[cur++] == arr[fromTable++])
@@ -82,7 +82,7 @@ namespace LZPCompressor
             return length;
         }
 
-        public byte[] Decompress(byte[] input)
+        public static byte[] Decompress(byte[] input)
         {
             List<byte> output = new List<byte>(input.Length);
             InputReader reader = new InputReader(input);
