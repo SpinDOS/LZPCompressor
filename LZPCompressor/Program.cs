@@ -32,9 +32,15 @@ namespace LZPCompressor
             sw.Stop();
             Console.WriteLine("Time: " + sw.ElapsedMilliseconds);
             Console.WriteLine("Output size: " + output.Length);
-            input = null;
+            var inp = input;
             input = new LZP1().Decompress(output);
             Console.WriteLine("Decompressed size: " + input.Length);
+            for (int i = 0; i < inp.Length; i++)
+            {
+                if (input[i] != inp[i])
+                    Console.WriteLine("Error");
+            }
+            Console.WriteLine("OK");
             Console.ReadLine();
 
             //Application.EnableVisualStyles();

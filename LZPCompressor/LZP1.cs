@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -10,66 +11,54 @@ namespace LZPCompressor
 {
     class LZP1
     {
+        private ushort Hash(byte x, byte y, byte z) => (ushort)(((x << 8) + z) ^ (y << 4));
+
         public byte[] Compress(byte[] input)
         {
             OutputWriter output = new OutputWriter();
-            Dictionary<short, int> table = new Dictionary<short, int>(1 << 12);
+            int[] table = new int[ushort.MaxValue + 1];
+            for (int i = 0; i < table.Length; i++)
+                table[i] = -1;
             output.WriteByte(input[0]);
             output.WriteByte(input[1]);
             output.WriteByte(input[2]);
             int cur = 3;
-            int inputLength = input.Length;
-            while (cur < inputLength - 1)
+            while (cur < input.Length - 1)
             {
-                short hash = Hash(input[cur - 3], input[cur - 2], input[cur - 1]);
-                int pos;
-                bool found = table.TryGetValue(hash, out pos);
+                ushort hash = Hash(input[cur - 3], input[cur - 2], input[cur - 1]);
+                int pos = table[hash];
                 table[hash] = cur;
-                if (found && input[cur] == input[pos]) // match
+                if (pos >= 0 && input[cur] == input[pos]) // match
                 {
                     output.WriteFlag(false);
                     output.WriteFlag(false);
-                    int length = FindLength(cur, pos, input);
-                    if (length == 1)
-                        output.WriteFlag(false);
-                    else
-                    {
-                        output.WriteFlag(true);
-                        output.WriteLength(length - 1);
-                    }
-                    cur += length;
                 }
                 else
                 {
                     byte literal = input[cur++];
                     hash = Hash(input[cur - 3], input[cur - 2], input[cur - 1]);
-                    found = table.TryGetValue(hash, out pos);
+                    pos = table[hash];
                     table[hash] = cur;
-                    if (found && input[cur] == input[pos]) // literal + match
+                    if (pos >= 0 && input[cur] == input[pos]) // literal + match
                     {
                         output.WriteFlag(false);
                         output.WriteFlag(true);
                         output.WriteByte(literal);
-                        int length = FindLength(cur, pos, input);
-                        if (length == 1)
-                            output.WriteFlag(false);
-                        else
-                        {
-                            output.WriteFlag(true);
-                            output.WriteLength(length - 1);
-                        }
-                        cur += length;
                     }
                     else // 2 literals
                     {
                         output.WriteFlag(true);
                         output.WriteByte(literal);
                         output.WriteByte(input[cur++]);
+                        continue;
                     }
                 }
+                int length = FindLength(cur, pos, input);
+                WriteLengthToOutput(length, output);
+                cur += length;
             }
 
-            if (cur == inputLength - 1)
+            if (cur == input.Length - 1)
             {
                 output.WriteFlag(true);
                 output.WriteByte(input[cur]);
@@ -77,11 +66,30 @@ namespace LZPCompressor
             return output.GetArray();
         }
 
+        private int FindLength(int cur, int fromTable, byte[] arr)
+        {
+            int result = 0;
+            while (cur < arr.Length && arr[cur++] == arr[fromTable++])
+                result++;
+            return result;
+        }
+
+        private void WriteLengthToOutput(int length, OutputWriter output)
+        {
+            if (length == 1)
+                output.WriteFlag(false);
+            else
+            {
+                output.WriteFlag(true);
+                output.WriteLength(length - 1);
+            }
+        }
+
         public byte[] Decompress(byte[] input)
         {
             List<byte> output = new List<byte>(input.Length);
             InputReader reader = new InputReader(input);
-            Dictionary<short, int> table = new Dictionary<short, int>(1 << 12);
+            int[] table = new int[ushort.MaxValue + 1];
             int inputLength = input.Length;
             output.Add(reader.ReadByte());
             output.Add(reader.ReadByte());
@@ -107,7 +115,7 @@ namespace LZPCompressor
                         output.Add(reader.ReadByte());
                         table[Hash(output[curpos - 3], output[curpos - 2], output[curpos - 1])] = curpos++;
                     }
-                    short hash = Hash(output[curpos - 3], output[curpos - 2], output[curpos - 1]);
+                    ushort hash = Hash(output[curpos - 3], output[curpos - 2], output[curpos - 1]);
                     int pos = table[hash];
                     table[hash] = curpos;
                     int length;
@@ -129,15 +137,6 @@ namespace LZPCompressor
             return output.ToArray();
         }
 
-        private short Hash(byte x, byte y, byte z) => (short)(x ^ (y << 7) ^ (z << 11));
-
-        private int FindLength(int cur, int fromTable, byte[] arr)
-        {
-            int result = 0;
-            while (cur < arr.Length && arr[cur++] == arr[fromTable++])
-                result++;
-            return result;
-        }
     }
 
     class OutputWriter
