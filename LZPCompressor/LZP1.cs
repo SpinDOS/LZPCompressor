@@ -87,53 +87,54 @@ namespace LZPCompressor
 
         public byte[] Decompress(byte[] input)
         {
+            return new byte[0];
             List<byte> output = new List<byte>(input.Length);
-            InputReader reader = new InputReader(input);
+            InputReader reader = new InputReader(input.Skip(4));
             int[] table = new int[ushort.MaxValue + 1];
-            int inputLength = input.Length;
-            output.Add(reader.ReadByte());
-            output.Add(reader.ReadByte());
-            output.Add(reader.ReadByte());
 
-            while (reader.CurrentPosition < inputLength - 1)
+            int curOut = 3;
+
+            while (true)
             {
                 if (reader.ReadFlag()) // 2 literals
                 {
-                    int curpos = output.Count;
                     output.Add(reader.ReadByte());
-                    if (reader.CurrentPosition >= inputLength - 1)
-                        break;
-                    table[Hash(output[curpos - 3], output[curpos - 2], output[curpos - 1])] = curpos++;
+                    table[Hash(output[curOut - 3], output[curOut - 2], output[curOut - 1])] = curOut++;
                     output.Add(reader.ReadByte());
-                    table[Hash(output[curpos - 3], output[curpos - 2], output[curpos - 1])] = curpos;
+                    table[Hash(output[curOut - 3], output[curOut - 2], output[curOut - 1])] = curOut++;
                 }
                 else
                 {
-                    int curpos = output.Count;
                     if (reader.ReadFlag()) // literal + match
                     {
                         output.Add(reader.ReadByte());
-                        table[Hash(output[curpos - 3], output[curpos - 2], output[curpos - 1])] = curpos++;
+                        table[Hash(output[curOut - 3], output[curOut - 2], output[curOut - 1])] = curOut++;
                     }
-                    ushort hash = Hash(output[curpos - 3], output[curpos - 2], output[curpos - 1]);
+                    // match
+                    ushort hash = Hash(output[curOut - 3], output[curOut - 2], output[curOut - 1]);
                     int pos = table[hash];
-                    table[hash] = curpos;
-                    int length;
-                    if (reader.ReadFlag())
-                        length = reader.ReadLength() + 1;
+                    table[hash] = curOut++;
+                    if (!reader.ReadFlag())
+                    {
+                        output.Add(output[pos]);
+                    }
                     else
-                        length = 1;
-                    for (int i = 0; i < length; i++)
-                        output.Add(output[pos++]);
+                    {
+                        int length = reader.ReadLength();
+                        curOut += length - 1;
+                        while (length-- > 0)
+                            output.Add(output[pos++]);
+                    }
+                    
                 }
             }
 
-            if (reader.CurrentPosition == inputLength - 1)
-            {
-                byte b = reader.ReadByte();
-                if (b != 0)
-                    output.Add(b);
-            }
+            //if (cur == inputLength - 1)
+            //{
+            //    byte b = reader.ReadByte();
+            //    if (b != 0)
+            //        output.Add(b);
+            //}
             return output.ToArray();
         }
 
@@ -331,22 +332,24 @@ namespace LZPCompressor
 
     class InputReader
     {
-        private byte[] input;
-        public uint CurrentPosition { get; private set; } = 0;
+        private IEnumerator<byte> Input;
+
         public byte NotReadBits { get; private set; } = 8;
-        public InputReader(byte[] Input)
+
+        public byte WorkingByte { get; private set; }
+        public InputReader(IEnumerable<byte> input)
         {
-            input = Input;
+            Input = input.GetEnumerator();
+            WorkingByte = Input.Current;
         }
 
         public bool ReadFlag()
         {
-            if (CurrentPosition == input.Length)
-                return false;
-            bool result = (input[CurrentPosition] & 1 << --NotReadBits) != 0;
+            bool result = (WorkingByte & 1 << --NotReadBits) != 0;
             if (NotReadBits == 0)
             {
-                CurrentPosition++;
+                Input.MoveNext();
+                WorkingByte = Input.Current;
                 NotReadBits = 8;
             }
             return result;
@@ -354,11 +357,11 @@ namespace LZPCompressor
 
         public byte ReadByte()
         {
-            byte result = 0;
-            for (int i = 7; i >= 0; i--)
+            byte result = (byte)(WorkingByte << (8 - NotReadBits));
+            if (Input.MoveNext())
             {
-                if (ReadFlag())
-                    result = (byte) (result + (1 << i));
+                WorkingByte = Input.Current;
+                result = (byte) (result + (WorkingByte >> NotReadBits));
             }
             return result;
         }
@@ -378,7 +381,7 @@ namespace LZPCompressor
             bits = 8;
             while (!ReadLengthSegment(ref length, bits))
             { }
-            return length;
+            return length + 1;
         }
 
         private bool ReadLengthSegment(ref int length, int bitCount)

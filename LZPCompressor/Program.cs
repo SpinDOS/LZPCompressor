@@ -38,7 +38,8 @@ namespace LZPCompressor
             for (int i = 0; i < inp.Length; i++)
             {
                 if (input[i] != inp[i])
-                    Console.WriteLine("Error");
+                    Console.WriteLine("Error " + i);
+                break;
             }
             Console.WriteLine("OK");
             Console.ReadLine();
