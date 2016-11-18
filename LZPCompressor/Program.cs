@@ -18,12 +18,9 @@ namespace LZPCompressor
 {
     static class Program
     {
-        /// <summary>
-        /// The main entry point for the application.
-        /// </summary>
-        [STAThread]
         static void Main(string[] args)
         {
+            #region Check user input
             string usageInfo = @"Usage: LZPCompessor.exe <c\d> <input> <output>";
 
             if (args.Length != 3 ||
@@ -61,7 +58,7 @@ namespace LZPCompressor
 
             if (inputArr.Length < 4)
             {
-                Console.WriteLine($@"File {inputFilename} is too small! " + 
+                Console.WriteLine($@"File {inputFilename} is too small! " +
                     @"Your must use files more than 4 bytes size");
                 return;
             }
@@ -72,7 +69,8 @@ namespace LZPCompressor
                 string ans;
                 do
                 {
-                    Console.Write($@"File {outputFilename} already exists. Do you want to rewrite it? (y\n): ");
+                    Console.Write($@"File {outputFilename} already exists. " +
+                        @"Do you want to rewrite it? (y\n): ");
                     ans = Console.ReadLine()?.ToUpper();
                 } while (ans != "Y" && ans != "N");
                 if (ans == "Y")
@@ -82,7 +80,8 @@ namespace LZPCompressor
                     Console.WriteLine(usageInfo);
                     return;
                 }
-            }
+            } 
+            #endregion
 
             FileStream output = null;
             try
@@ -101,7 +100,9 @@ namespace LZPCompressor
                 }
                 output.Write(result, 0, result.Length);
             }
-            catch (IndexOutOfRangeException)
+
+            #region Handle errors
+            catch (NotLZP1InputException)
             {
                 Console.WriteLine($@"{inputFilename} is not LZP compressed file");
                 return;
@@ -129,7 +130,9 @@ namespace LZPCompressor
                     return;
                 }
                 throw;
-            }
+            } 
+            #endregion
+
             finally
             {
                 long? length = output?.Length;

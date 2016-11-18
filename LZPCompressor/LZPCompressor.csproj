@@ -49,7 +49,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="LZP1.cs" />
+    <Compile Include="Exceptions.cs" />
+    <Compile Include="LZP1_Logic.cs" />
+    <Compile Include="LZP1_Reader.cs" />
+    <Compile Include="LZP1_Writer.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="Properties\Resources.resx">
