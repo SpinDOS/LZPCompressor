@@ -84,11 +84,12 @@ namespace LZPCompressor
             #endregion
 
             FileStream output = null;
+            ICompressor compressor = new LZP1Compressor(); 
             try
             {
                 output = File.OpenWrite(outputFilename);
                 var sw = Stopwatch.StartNew();
-                byte[] result = isCompress ? LZP1.Compress(inputArr) : LZP1.Decompress(inputArr);
+                byte[] result = isCompress ? compressor.Compress(inputArr) : compressor.Decompress(inputArr);
                 sw.Stop();
                 Console.WriteLine((isCompress ? "Compress" : "Decompress") +
                                   $@" complete in {sw.ElapsedMilliseconds} milliseconds");
@@ -140,7 +141,7 @@ namespace LZPCompressor
                 if (length.HasValue && length.Value < 4)
                     File.Delete(outputFilename);
             }
-
+            Console.Read();
         }
     }
 }

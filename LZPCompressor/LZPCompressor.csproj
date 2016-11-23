@@ -50,6 +50,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Exceptions.cs" />
+    <Compile Include="ICompressor.cs" />
     <Compile Include="LZP1_Logic.cs" />
     <Compile Include="LZP1_Reader.cs" />
     <Compile Include="LZP1_Writer.cs" />

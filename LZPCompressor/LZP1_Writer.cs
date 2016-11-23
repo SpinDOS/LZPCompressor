@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace LZPCompressor
 {
-    internal static partial class LZP1
+    internal partial class LZP1Compressor
     {
         /// <summary>
         /// Contain logic to encode values and write them into virtual output
@@ -18,9 +18,9 @@ namespace LZPCompressor
             private int _bitsBusy = 0; // Count of bits we modifyed in _workingByte
 
             /// <summary>
-            /// Write byte to output
+            /// Write literal to output
             /// </summary>
-            public void WriteByte(int b)
+            public void WriteLiteral(byte b)
             {
                 // _bitsBusy will not changed
                 // Write to workingbyte first bitsBusy bits of b and flush
@@ -117,7 +117,7 @@ namespace LZPCompressor
                     return true;
                 }
                 // If length can not fit in segment
-                // Write 1's and decreasy length
+                // Write 1's and decrease length
                 for (int i = 0; i < bits; i++)
                     WriteFlag(true);
                 length -= (1 << bits) - 1;

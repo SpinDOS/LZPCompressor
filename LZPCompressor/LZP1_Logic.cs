@@ -12,17 +12,12 @@ namespace LZPCompressor
     /// <summary>
     /// Contain logic for using LZP-1 compression algorithm
     /// </summary>
-    internal static partial class LZP1
+    internal partial class LZP1Compressor : ICompressor
     {
         // Hash 24 bit -> 16 bit
         private static ushort Hash(byte x, byte y, byte z) => (ushort) (((x << 8) + z) ^ (y << 4));
 
-        /// <summary>
-        /// Compress input data
-        /// </summary>
-        /// <exception cref="ArgumentNullException">input is null</exception>
-        /// <exception cref="BadInputException">input is too small</exception>
-        public static byte[] Compress(byte[] input)
+        public byte[] Compress(byte[] input)
         {
             // Check input
             if (input == null)
@@ -37,14 +32,14 @@ namespace LZPCompressor
                 table[i] = -1;
 
             // Write first 3 bytes
-            output.WriteByte(input[0]);
-            output.WriteByte(input[1]);
-            output.WriteByte(input[2]);
+            output.WriteLiteral(input[0]);
+            output.WriteLiteral(input[1]);
+            output.WriteLiteral(input[2]);
             int curPos = 3;
 
-            // Loop through all array until pre-last byte 
-            // After pass it stops on the end (if match) or 
-            // before last not-match byte
+            // Loop through whole array until pre-last byte 
+            // In the end it stops on the end (if match) or 
+            // before last not-matched byte
             while (curPos < input.Length - 1)
             {
                 // Working with current context (previous 3 literals)
@@ -66,8 +61,8 @@ namespace LZPCompressor
                     {
                         // Write flag, 2 literals without compressing
                         output.WriteFlag(true);
-                        output.WriteByte(literal);
-                        output.WriteByte(input[curPos++]);
+                        output.WriteLiteral(literal);
+                        output.WriteLiteral(input[curPos++]);
                         continue; // goto next byte
                     }
                     else // Literal + match
@@ -75,7 +70,7 @@ namespace LZPCompressor
                         // Write flags and not-matching literal
                         output.WriteFlag(false);
                         output.WriteFlag(true);
-                        output.WriteByte(literal);
+                        output.WriteLiteral(literal);
                         // goto write length
                     }
                 }
@@ -96,9 +91,9 @@ namespace LZPCompressor
             // If not - all bytes were written
             if (curPos == input.Length - 1)
             {
-                // Write with common form (with control bit) for valid reading
+                // Write with common format (with control bit) for valid reading
                 output.WriteFlag(true);
-                output.WriteByte(input[curPos]);
+                output.WriteLiteral(input[curPos]);
             }
             return output.GetArray();
         }
@@ -112,13 +107,8 @@ namespace LZPCompressor
             return length;
         }
 
-        /// <summary>
-        /// Decompress input array
-        /// </summary>
-        /// <exception cref="ArgumentNullException">input is null</exception>
-        /// <exception cref="BadInputException">input is too small</exception>
-        /// <exception cref="NotLZP1InputException">input is not LZP1 compressed data</exception>
-        public static byte[] Decompress(byte[] input)
+        
+        public byte[] Decompress(byte[] input)
         {
             // Initialization
             List<byte> output = new List<byte>(input.Length);
@@ -134,9 +124,9 @@ namespace LZPCompressor
             try
             {
                 // Loop through input while can read flag
-                // as we added to last byte in compressing some bits of 1
+                // As we added to last byte bits of 1 while compressing
                 // last byte of input can contain 0 flag and then length
-                // or 1 flag and next n bits of 1 - so we check it in the loop
+                // or 1 flag and next n bits of 1 - so we check it in the inner if
                 while (reader.CanReadFlag)
                 {
                     // Read first control bit
@@ -146,7 +136,7 @@ namespace LZPCompressor
                         if (!reader.CanRead2Bytes)
                             break;
 
-                        // Read 2 literals and add in to hashtable
+                        // Read 2 literals and add them to the hashtable
                         output.Add(reader.ReadByte());
                         table[Hash(output[curPos - 3], output[curPos - 2], output[curPos - 1])] = curPos++;
                         output.Add(reader.ReadByte());
@@ -154,7 +144,7 @@ namespace LZPCompressor
                     }
                     else
                     {
-                        // Read second control bit
+                        // Read second control flag
                         if (reader.ReadFlag()) // literal + match
                         {
                             // Read literal and handle it

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace LZPCompressor
 {
-    internal static partial class LZP1
+    internal partial class LZP1Compressor
     {
         /// <summary>
         /// Contain logic to decode values from input array with compressed data
@@ -37,7 +37,7 @@ namespace LZPCompressor
             /// <returns>True if current bit is 1</returns>
             public bool ReadFlag()
             {
-                // If there is no not read bits in working byte read next one
+                // If there is no not read bits in working byte then read next one
                 if (_notReadBits == 0)
                 {
                     _workingByte = _arr[++_currentPos];
@@ -101,10 +101,10 @@ namespace LZPCompressor
                 {
                     if (ReadFlag())
                         length += k;
-                    else // If there is at least one 0 than return true
+                    else // If there is at least one 0 then return true
                         result = true;
                 }
-                // If length has fit it's value is greater that read value
+                // If length has fit then it's value is greater that read value
                 if (result)
                     length += 1;
                 return result;
