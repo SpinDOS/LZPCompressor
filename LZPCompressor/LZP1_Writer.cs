@@ -2,12 +2,12 @@
 
 namespace LZPCompressor
 {
-    internal partial class LZP1Compressor
+    public sealed partial class LZP1Compressor
     {
         /// <summary>
         /// Contain logic to encode values and write them into virtual output
         /// </summary>
-        internal sealed class LZP1ContentWriter
+        private sealed class LZP1ContentWriter
         {
             private readonly List<byte> _arr = new List<byte>(); // Output array
             private int _workingByte = 0; // Current modifying byte

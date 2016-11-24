@@ -6,7 +6,7 @@ namespace LZPCompressor
     /// <summary>
     /// Contain logic for using LZP-1 compression algorithm
     /// </summary>
-    internal partial class LZP1Compressor : ICompressor
+    public sealed partial class LZP1Compressor : ICompressor
     {
         // Hash 24 bit -> 16 bit
         private static ushort Hash(byte x, byte y, byte z) => (ushort) (((x << 8) + z) ^ (y << 4));

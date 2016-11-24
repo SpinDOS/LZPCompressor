@@ -1,11 +1,11 @@
 ﻿namespace LZPCompressor
 {
-    internal partial class LZP1Compressor
+    public sealed partial class LZP1Compressor
     {
         /// <summary>
         /// Contain logic to decode values from input array with compressed data
         /// </summary>
-        internal sealed class LZP1ContentReader
+        private sealed class LZP1ContentReader
         {
             private readonly byte[] _arr; // Input array
             // Position for current working byte in input array
