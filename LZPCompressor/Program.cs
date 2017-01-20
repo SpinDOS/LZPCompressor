@@ -137,7 +137,6 @@ namespace LZPCompressor
                 if (length.HasValue && length.Value < 4)
                     File.Delete(outputFilename);
             }
-            Console.Read();
         }
     }
 }
